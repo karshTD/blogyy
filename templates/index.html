@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blogy Engine — AI Blog Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0b0c0e;
+    --surface: #111316;
+    --surface2: #1a1d22;
+    --border: #232730;
+    --border2: #2e333d;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --accent: #7c6af7;
+    --accent2: #a78bfa;
+    --green: #34d399;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --mono: 'DM Mono', monospace;
+    --serif: 'DM Serif Display', serif;
+    --sans: 'Syne', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .noise {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 200px;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative; z-index: 1;
+  }
+
+  .logo {
+    font-family: var(--serif);
+    font-size: 22px;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+
+  .logo span { color: var(--accent2); font-style: italic; }
+
+  .badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 40px;
+    position: relative; z-index: 1;
+  }
+
+  .hero {
+    margin-bottom: 48px;
+  }
+
+  .hero h1 {
+    font-family: var(--serif);
+    font-size: clamp(32px, 5vw, 52px);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin-bottom: 12px;
+  }
+
+  .hero h1 em { color: var(--accent2); font-style: italic; }
+
+  .hero p {
+    color: var(--muted);
+    font-size: 15px;
+    max-width: 520px;
+  }
+
+  .pipeline-steps {
+    display: flex;
+    gap: 0;
+    margin-bottom: 40px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .step {
+    flex: 1;
+    padding: 14px 16px;
+    border-right: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+    transition: all 0.3s;
+    position: relative;
+  }
+
+  .step:last-child { border-right: none; }
+  .step .num { font-size: 10px; opacity: 0.5; display: block; margin-bottom: 3px; }
+  .step .label { display: block; font-size: 11px; }
+
+  .step.active { background: var(--surface2); color: var(--accent2); }
+  .step.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    animation: pulse-bar 1s ease-in-out infinite;
+  }
+  .step.done { color: var(--green); }
+  .step.done::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--green);
+  }
+
+  @keyframes pulse-bar { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .input-area {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 40px;
+    align-items: stretch;
+  }
+
+  .keyword-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    padding: 14px 20px;
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .keyword-input:focus { border-color: var(--accent); }
+  .keyword-input::placeholder { color: var(--muted); }
+
+  .generate-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 14px 28px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .generate-btn:hover { background: var(--accent2); transform: translateY(-1px); }
+  .generate-btn:active { transform: translateY(0); }
+  .generate-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .output-grid {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  .output-grid.visible { opacity: 1; }
+
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+
+  .card-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .seo-score-ring {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .ring {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 500;
+    border: 3px solid var(--border2);
+    flex-shrink: 0;
+  }
+
+  .ring.good { border-color: var(--green); color: var(--green); }
+  .ring.ok { border-color: var(--amber); color: var(--amber); }
+  .ring.bad { border-color: var(--red); color: var(--red); }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+
+  .metric-row:last-child { border-bottom: none; }
+  .metric-label { color: var(--muted); }
+
+  .metric-val { font-family: var(--mono); font-size: 12px; }
+  .metric-val.good { color: var(--green); }
+  .metric-val.ok { color: var(--amber); }
+  .metric-val.bad { color: var(--red); }
+
+  .analysis-item {
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+
+  .analysis-item:last-child { border-bottom: none; }
+
+  .analysis-key {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 2px;
+  }
+
+  .analysis-val { color: var(--text); line-height: 1.4; }
+
+  .blog-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .blog-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .toolbar-btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .toolbar-btn:hover { background: var(--border); color: var(--text); }
+  .toolbar-btn.active { background: var(--surface); color: var(--accent2); border-color: var(--accent); }
+
+  .blog-content {
+    padding: 32px 36px;
+    overflow-y: auto;
+    max-height: 720px;
+    flex: 1;
+  }
+
+  .blog-content.raw {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  /* Blog rendered styles */
+  .blog-content h1 { font-family: var(--serif); font-size: 28px; line-height: 1.2; margin-bottom: 20px; color: var(--text); letter-spacing: -0.02em; }
+  .blog-content h2 { font-family: var(--serif); font-size: 20px; margin: 28px 0 12px; color: var(--text); }
+  .blog-content h3 { font-size: 15px; font-weight: 700; margin: 20px 0 8px; color: var(--accent2); }
+  .blog-content p { margin-bottom: 14px; color: #bdc3cc; line-height: 1.75; font-size: 14px; }
+  .blog-content strong { color: var(--text); font-weight: 600; }
+  .blog-content em { color: var(--accent2); font-style: italic; }
+  .blog-content ul, .blog-content ol { margin: 12px 0 16px 20px; }
+  .blog-content li { color: #bdc3cc; margin-bottom: 6px; font-size: 14px; line-height: 1.65; }
+  .blog-content table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px; }
+  .blog-content th { background: var(--surface2); color: var(--accent2); padding: 10px 14px; text-align: left; border: 1px solid var(--border2); font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .blog-content td { padding: 10px 14px; border: 1px solid var(--border); color: #bdc3cc; }
+  .blog-content tr:nth-child(even) td { background: var(--surface2); }
+
+  .outline-panel {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.8;
+    white-space: pre-wrap;
+  }
+
+  .copy-notice {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--green);
+    color: #000;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    transform: translateY(60px);
+    transition: transform 0.3s;
+    z-index: 100;
+  }
+
+  .copy-notice.show { transform: translateY(0); }
+
+  .status-bar {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    min-height: 18px;
+    transition: color 0.3s;
+  }
+
+  .status-bar.active { color: var(--accent2); }
+  .status-bar.done { color: var(--green); }
+
+  .keyword-pills {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+  }
+
+  .kpill {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  @media (max-width: 800px) {
+    .output-grid { grid-template-columns: 1fr; }
+    .pipeline-steps { display: none; }
+    header { padding: 16px 20px; }
+    .main { padding: 32px 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+
+<header>
+  <div class="logo">Blogy <span>Engine</span></div>
+  <span class="badge">v1.0 · Groq · LLaMA 3 70B</span>
+</header>
+
+<div class="main">
+  <div class="hero">
+    <h1>Turn a keyword into a<br><em>ranking blog</em> in seconds.</h1>
+    <p>5-step AI pipeline: intent analysis → outline → draft → humanise → SEO validate.</p>
+  </div>
+
+  <div class="pipeline-steps" id="pipeline">
+    <div class="step" id="s1"><span class="num">01</span><span class="label">Keyword analysis</span></div>
+    <div class="step" id="s2"><span class="num">02</span><span class="label">Outline</span></div>
+    <div class="step" id="s3"><span class="num">03</span><span class="label">Draft</span></div>
+    <div class="step" id="s4"><span class="num">04</span><span class="label">Humanise</span></div>
+    <div class="step" id="s5"><span class="num">05</span><span class="label">SEO validate</span></div>
+  </div>
+
+  <div class="input-area">
+    <input class="keyword-input" id="kwInput" type="text"
+      placeholder="Enter keyword e.g. best AI blog tool India..."
+      onkeydown="if(event.key==='Enter') generate()" />
+    <button class="generate-btn" id="genBtn" onclick="generate()">Generate blog →</button>
+  </div>
+
+  <div class="status-bar" id="statusBar"></div>
+
+  <div class="output-grid" id="outputGrid">
+    <div class="sidebar">
+
+      <div class="card" id="seoCard">
+        <div class="card-title">SEO score</div>
+        <div class="seo-score-ring">
+          <div class="ring" id="scoreRing">—</div>
+          <div>
+            <div style="font-size:13px;font-weight:600;" id="scoreLabel">Not run</div>
+            <div style="font-size:12px;color:var(--muted);" id="scoreSubtxt"></div>
+          </div>
+        </div>
+        <div id="metricsBox"></div>
+      </div>
+
+      <div class="card" id="analysisCard">
+        <div class="card-title">Keyword intelligence</div>
+        <div id="analysisBox"></div>
+      </div>
+
+    </div>
+
+    <div class="blog-panel">
+      <div class="blog-toolbar">
+        <button class="toolbar-btn active" id="tabPreview" onclick="switchTab('preview')">Preview</button>
+        <button class="toolbar-btn" id="tabOutline" onclick="switchTab('outline')">Outline</button>
+        <button class="toolbar-btn" id="tabHtml" onclick="switchTab('html')">HTML</button>
+        <div style="flex:1;"></div>
+        <button class="toolbar-btn" onclick="copyBlog()">Copy HTML</button>
+        <button class="toolbar-btn" onclick="downloadBlog()">Download</button>
+      </div>
+      <div class="blog-content" id="blogContent">
+        <div style="color:var(--muted);font-size:14px;margin-top:40px;text-align:center;font-family:var(--mono);">
+          ← Enter a keyword and hit Generate
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="copy-notice" id="copyNotice">Copied to clipboard</div>
+
+<script>
+let currentData = null;
+let currentTab = 'preview';
+
+function setStep(n, state) {
+  for(let i=1;i<=5;i++) {
+    const el = document.getElementById('s'+i);
+    el.classList.remove('active','done');
+    if(i < n) el.classList.add('done');
+    if(i === n) el.classList.add('active');
+  }
+}
+
+function allDone() {
+  for(let i=1;i<=5;i++) {
+    const el = document.getElementById('s'+i);
+    el.classList.remove('active');
+    el.classList.add('done');
+  }
+}
+
+function generate() {
+  const kw = document.getElementById('kwInput').value.trim();
+  if(!kw) return;
+  
+  document.getElementById('genBtn').disabled = true;
+  document.getElementById('outputGrid').classList.remove('visible');
+  document.getElementById('blogContent').innerHTML = '<div style="color:var(--muted);font-size:13px;font-family:var(--mono);margin-top:20px;">Generating...</div>';
+
+  const status = document.getElementById('statusBar');
+  status.className = 'status-bar active';
+
+  const es = new EventSource('/generate?' + new URLSearchParams({_: Date.now()}));
+
+  fetch('/generate', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({keyword: kw})
+  }).then(res => {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    function read() {
+      reader.read().then(({done, value}) => {
+        if(done) return;
+        buf += decoder.decode(value, {stream:true});
+        const lines = buf.split('\n\n');
+        buf = lines.pop();
+        lines.forEach(line => {
+          if(line.startsWith('data: ')) {
+            const msg = JSON.parse(line.slice(6));
+            handleMsg(msg);
+          }
+        });
+        read();
+      });
+    }
+    read();
+  });
+
+  function handleMsg(msg) {
+    if(msg.type === 'progress') {
+      setStep(msg.step, 'active');
+      status.textContent = msg.msg;
+    } else if(msg.type === 'done') {
+      allDone();
+      status.className = 'status-bar done';
+      status.textContent = 'Done. Blog generated + SEO validated.';
+      currentData = msg.data;
+      renderOutput(msg.data);
+      document.getElementById('genBtn').disabled = false;
+    } else if(msg.type === 'error') {
+      status.className = 'status-bar';
+      status.textContent = 'Error: ' + msg.msg;
+      document.getElementById('genBtn').disabled = false;
+    }
+  }
+}
+
+function renderOutput(data) {
+  document.getElementById('outputGrid').classList.add('visible');
+  renderSEO(data.seo);
+  renderAnalysis(data.analysis);
+  renderBlog(data);
+}
+
+function renderSEO(seo) {
+  const score = seo.seo_score;
+  const ring = document.getElementById('scoreRing');
+  ring.textContent = score;
+  ring.className = 'ring ' + (score >= 70 ? 'good' : score >= 45 ? 'ok' : 'bad');
+
+  document.getElementById('scoreLabel').textContent = score >= 70 ? 'Strong' : score >= 45 ? 'Needs work' : 'Weak';
+  document.getElementById('scoreSubtxt').textContent = seo.word_count + ' words · ' + seo.keyword_density + '% density';
+
+  const metrics = [
+    ['Word count', seo.word_count, seo.length_ok ? 'good':'bad'],
+    ['Keyword density', seo.keyword_density + '%', seo.density_ok ? 'good':'bad'],
+    ['H1 / H2 / H3', `${seo.h1_count} / ${seo.h2_count} / ${seo.h3_count}`, seo.structure_ok ? 'good':'ok'],
+    ['Comparison table', seo.has_table ? 'Yes':'No', seo.has_table ? 'good':'ok'],
+    ['Lists', seo.has_list ? 'Yes':'No', seo.has_list ? 'good':'ok'],
+    ['Snippet ready', seo.snippet_ready ? 'Yes':'No', seo.snippet_ready ? 'good':'ok'],
+  ];
+
+  document.getElementById('metricsBox').innerHTML = metrics.map(([l,v,c]) =>
+    `<div class="metric-row"><span class="metric-label">${l}</span><span class="metric-val ${c}">${v}</span></div>`
+  ).join('');
+}
+
+function renderAnalysis(analysis) {
+  const show = ['PRIMARY_INTENT','SEARCH_VOLUME','COMPETITION','SERP_GAP','GEO_CONTEXT','META_TITLE','META_DESC'];
+  let html = '';
+  show.forEach(k => {
+    if(analysis[k]) {
+      html += `<div class="analysis-item">
+        <div class="analysis-key">${k.replace(/_/g,' ')}</div>
+        <div class="analysis-val">${analysis[k]}</div>
+      </div>`;
+    }
+  });
+
+  const cluster = analysis['CLUSTER_KEYWORDS'] || '';
+  if(cluster) {
+    html += `<div class="analysis-item">
+      <div class="analysis-key">Cluster keywords</div>
+      <div class="keyword-pills">${cluster.split(',').map(k => `<span class="kpill">${k.trim()}</span>`).join('')}</div>
+    </div>`;
+  }
+  document.getElementById('analysisBox').innerHTML = html;
+}
+
+function renderBlog(data) {
+  switchTab(currentTab, data);
+}
+
+function switchTab(tab, data) {
+  currentTab = tab;
+  const d = data || currentData;
+  if(!d) return;
+  ['tabPreview','tabOutline','tabHtml'].forEach(id => document.getElementById(id).classList.remove('active'));
+  document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+
+  const bc = document.getElementById('blogContent');
+  if(tab === 'preview') {
+    bc.className = 'blog-content';
+    bc.innerHTML = d.blog_html;
+  } else if(tab === 'outline') {
+    bc.className = 'blog-content';
+    bc.innerHTML = `<div class="outline-panel">${d.outline}</div>`;
+  } else {
+    bc.className = 'blog-content raw';
+    bc.textContent = d.blog_html;
+  }
+}
+
+function copyBlog() {
+  if(!currentData) return;
+  navigator.clipboard.writeText(currentData.blog_html);
+  const n = document.getElementById('copyNotice');
+  n.classList.add('show');
+  setTimeout(() => n.classList.remove('show'), 2000);
+}
+
+function downloadBlog() {
+  if(!currentData) return;
+  const kw = currentData.keyword.replace(/\s+/g,'-').toLowerCase();
+  const blob = new Blob([currentData.blog_html], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `blog-${kw}.html`;
+  a.click();
+}
+</script>
+</body>
+</html>
