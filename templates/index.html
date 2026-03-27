@@ -30,10 +30,28 @@
     background: var(--bg);
     color: var(--text);
     font-family: var(--sans);
-    font-size: 15px;
-    line-height: 1.6;
+    font-size: 16px;
+    line-height: 1.8;
     min-height: 100vh;
   }
+
+  .blog-content {
+  padding: 40px 45px; /* More white space */
+  font-size: 17px; /* Larger body text for the blog itself */
+}
+
+.blog-content h1 { font-size: 34px; margin-bottom: 24px; }
+.blog-content h2 { font-size: 24px; margin-top: 35px; }
+.blog-content h3 { font-size: 18px; margin-top: 25px; }
+.blog-content p { margin-bottom: 16px; }
+.blog-content strong { color: var(--text); font-weight: 600; }
+.blog-content em { color: var(--accent2); font-style: italic; }
+.blog-content ul, .blog-content ol { margin: 12px 0 16px 20px; }
+.blog-content li { color: #bdc3cc; margin-bottom: 6px; font-size: 14px; line-height: 1.65; }
+.blog-content table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px; }
+.blog-content th { background: var(--surface2); color: var(--accent2); padding: 10px 14px; text-align: left; border: 1px solid var(--border2); font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+.blog-content td { padding: 10px 14px; border: 1px solid var(--border); color: #bdc3cc; }
+.blog-content tr:nth-child(even) td { background: var(--surface2); }
 
   .noise {
     position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.025;
@@ -448,13 +466,26 @@
 
     <div class="blog-panel">
       <div class="blog-toolbar">
-        <button class="toolbar-btn active" id="tabPreview" onclick="switchTab('preview')">Preview</button>
+        <div class="platform-tabs" style="display: flex; gap: 5px; margin-right: 15px;">
+          <button class="toolbar-btn active" id="btnMaster" onclick="switchPlatform('Master')">SEO Master</button>
+          <button class="toolbar-btn" id="btnLinkedIn" onclick="switchPlatform('LinkedIn')">LinkedIn</button>
+          <button class="toolbar-btn" id="btnMedium" onclick="switchPlatform('Medium')">Medium</button>
+          <button class="toolbar-btn" id="btnDevto" onclick="switchPlatform('Dev.to')">Dev.to</button>
+          <button class="toolbar-btn" id="btnSubstack" onclick="switchPlatform('Substack')">Substack</button>
+        </div>
+        
+        <div style="height: 20px; width: 1px; background: var(--border2); margin: 0 10px;"></div>
+    
+        <button class="toolbar-btn" id="tabPreview" onclick="switchTab('preview')">Preview</button>
         <button class="toolbar-btn" id="tabOutline" onclick="switchTab('outline')">Outline</button>
-        <button class="toolbar-btn" id="tabHtml" onclick="switchTab('html')">HTML</button>
+        <button class="toolbar-btn" id="tabHtml" onclick="switchTab('html')">HTML/MD</button>
+        
         <div style="flex:1;"></div>
-        <button class="toolbar-btn" onclick="copyBlog()">Copy HTML</button>
+    
+        <button class="toolbar-btn" onclick="copyBlog()">Copy Content</button>
         <button class="toolbar-btn" onclick="downloadBlog()">Download</button>
       </div>
+    
       <div class="blog-content" id="blogContent">
         <div style="color:var(--muted);font-size:14px;margin-top:40px;text-align:center;font-family:var(--mono);">
           ← Enter a keyword and hit Generate
@@ -639,6 +670,38 @@ function downloadBlog() {
   a.download = `blog-${kw}.html`;
   a.click();
 }
+
+function switchPlatform(platform) {
+  currentPlatform = platform;
+  
+  // Update button UI
+  const buttons = document.querySelectorAll('.platform-tabs .toolbar-btn');
+  buttons.forEach(btn => {
+    btn.classList.toggle('active', btn.innerText.includes(platform));
+  });
+
+  renderBlog(currentData);
+}
+
+// Update your existing switchTab or renderBlog to account for the platform
+function renderBlog(data) {
+  if (!data) return;
+  const bc = document.getElementById('blogContent');
+  
+  // Determine source content
+  let content = (currentPlatform === 'Master') 
+    ? data.blog_html 
+    : data.platform_variants[currentPlatform];
+
+  if (currentTab === 'preview') {
+    bc.className = 'blog-content';
+    bc.innerHTML = content;
+  } else {
+    bc.className = 'blog-content raw';
+    bc.textContent = content;
+  }
+}
+
 </script>
 </body>
 </html>
