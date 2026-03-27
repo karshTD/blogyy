@@ -183,6 +183,56 @@ def validate_seo(blog_html, keyword):
     }
 
 
+
+
+# ── STEP 6: Platform-Specific Adaptation ───────────────────────────────────
+PLATFORM_CONFIGS = {
+    "LinkedIn": {
+        "style": "High-engagement, professional social post. Use punchy one-sentence paragraphs, 5-7 bullet points, and a 'hook' at the top to stop the scroll. No HTML tags, use plain text with emojis for bullet points.",
+        "length": "Shortened (approx 400-600 words highlights)",
+        "format": "Plain Text"
+    },
+    "Medium": {
+        "style": "Story-driven, authoritative long-form article. Keep high-quality H2/H3 headers. Focus on reader empathy and deep insights. Include a 'Read Time' estimate at the top.",
+        "length": "Full length",
+        "format": "Markdown/HTML"
+    },
+    "Dev.to": {
+        "style": "Technical, builder-focused guide. Use code-block formatting where relevant. Direct, no-fluff tone. Must be in clean GitHub-Flavored Markdown.",
+        "length": "Full length",
+        "format": "Markdown"
+    },
+    "WordPress": {
+        "style": "Standard SEO-optimized blog. Include meta-tags, image alt-text suggestions in brackets, and clear table of contents. Focus on keyword placement for snippet eligibility.",
+        "length": "Full length",
+        "format": "Clean HTML"
+    },
+    "Substack": {
+        "style": "Newsletter style. Personal, direct address to the reader ('You'). Bold the most important takeaways. Clear, centered CTA buttons.",
+        "length": "Full length",
+        "format": "Markdown"
+    }
+}
+
+def adapt_for_platform(blog_html, platform_name):
+    config = PLATFORM_CONFIGS.get(platform_name)
+    if not config:
+        return blog_html
+
+    system = f"""You are a platform-optimization expert. Convert the provided blog into a version specifically for {platform_name}.
+    Rules:
+    - Target Style: {config['style']}
+    - Target Length: {config['length']}
+    - Output Format: {config['format']}
+    - Ensure 'Platform Adaptation Quality' is 100%.
+    - Maintain the primary SEO intent but change the 'vibe' to fit the platform.
+    Return ONLY the adapted content."""
+
+    user = f"Adapt this blog content for {platform_name}:\n\n{blog_html}"
+    return chat(system, user, temperature=0.6)
+
+
+
 # ── MASTER PIPELINE ────────────────────────────────────────────────────────────
 def run_pipeline(keyword, progress_callback=None):
     def progress(step, msg):
@@ -204,10 +254,19 @@ def run_pipeline(keyword, progress_callback=None):
     progress(5, "Validating SEO metrics...")
     seo = validate_seo(humanised, keyword)
 
+    progress(6, "Adapting content for 5 Approved Platforms...")
+    variants = {}
+    platforms = ["LinkedIn", "Medium", "Dev.to", "WordPress", "Substack"]
+    
+    for p in platforms:
+        progress(6, f"Creating {p} version...")
+        variants[p] = adapt_for_platform(humanised, p)
+
     return {
         "keyword": keyword,
         "analysis": analysis,
         "outline": outline,
         "blog_html": humanised,
         "seo": seo,
+        "platform_variants": variants,
     }
