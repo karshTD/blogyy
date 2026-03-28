@@ -3,6 +3,27 @@ import re
 from dotenv import load_dotenv
 from groq import Groq
 
+
+
+_INJECTION_PHRASES = [
+    "ignore all", "ignore previous", "act as", "jailbreak",
+    "system prompt", "forget everything", "forget all",
+    "disregard", "dan mode", "pretend you are", "pretend to be",
+    "new persona", "prompt injection", "reveal your prompt",
+    "reveal your instructions", "what are your instructions",
+]
+
+def sanitize_keyword(keyword: str):
+    if re.search(r"<[^>]+>", keyword):
+        return keyword, True
+    cleaned = re.sub(r"[\x00-\x1f\x7f]", "", keyword).strip()
+    if any(phrase in cleaned.lower() for phrase in _INJECTION_PHRASES):
+        return cleaned, True
+    if "<" in cleaned or ">" in cleaned or cleaned.count("\n") > 2:
+        return cleaned, True
+    return cleaned, False
+
+
 load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))

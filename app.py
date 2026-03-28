@@ -3,6 +3,19 @@ import queue
 import threading
 from flask import Flask, render_template, request, Response, stream_with_context
 from engine import run_pipeline
+from collections import defaultdict
+import time
+
+REQUEST_LOG = defaultdict(list)
+
+def is_rate_limited(ip):
+    now = time.time()
+    REQUEST_LOG[ip] = [t for t in REQUEST_LOG[ip] if now - t < 60]
+    if len(REQUEST_LOG[ip]) >= 5:
+        return True
+    REQUEST_LOG[ip].append(now)
+    return False
+
 
 app = Flask(__name__)
 
@@ -12,11 +25,21 @@ def index():
 
 @app.route("/generate", methods=["POST"])
 def generate():
+    if is_rate_limited(request.remote_addr):
+        return {"error": "Rate limit exceeded"}, 429
+
     data = request.json # Get full json body
     keyword = data.get("keyword", "").strip()
     
     if not keyword:
         return {"error": "No keyword provided"}, 400
+    if len(keyword) > 120:
+        return {"error": "Keyword too long. Keep it under 120 characters."}, 400
+
+    clean_keyword, flagged = sanitize_keyword(keyword)
+    if flagged:
+        return {"error": "Invalid input. Please enter a plain SEO keyword."}, 400
+
 
     q = queue.Queue()
 
