@@ -2,7 +2,7 @@ import json
 import queue
 import threading
 from flask import Flask, render_template, request, Response, stream_with_context
-from engine import run_pipeline
+from engine import run_pipeline, sanitize_keyword
 from collections import defaultdict
 import time
 

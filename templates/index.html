@@ -500,10 +500,12 @@
 <script>
 let currentData = null;
 let currentTab = 'preview';
+let currentPlatform = 'Master';
 
-function setStep(n, state) {
-  for(let i=1;i<=5;i++) {
+function setStep(n) {
+  for(let i=1;i<=6;i++) {
     const el = document.getElementById('s'+i);
+    if(!el) continue;
     el.classList.remove('active','done');
     if(i < n) el.classList.add('done');
     if(i === n) el.classList.add('active');
@@ -511,25 +513,31 @@ function setStep(n, state) {
 }
 
 function allDone() {
-  for(let i=1;i<=5;i++) {
+  for(let i=1;i<=6;i++) {
     const el = document.getElementById('s'+i);
+    if(!el) continue;
     el.classList.remove('active');
     el.classList.add('done');
   }
 }
 
+function getActiveContent() {
+  if(!currentData) return '';
+  return (currentPlatform === 'Master')
+    ? currentData.blog_html
+    : (currentData.platform_variants && currentData.platform_variants[currentPlatform]) || currentData.blog_html;
+}
+
 function generate() {
   const kw = document.getElementById('kwInput').value.trim();
   if(!kw) return;
-  
+
   document.getElementById('genBtn').disabled = true;
   document.getElementById('outputGrid').classList.remove('visible');
   document.getElementById('blogContent').innerHTML = '<div style="color:var(--muted);font-size:13px;font-family:var(--mono);margin-top:20px;">Generating...</div>';
 
   const status = document.getElementById('statusBar');
   status.className = 'status-bar active';
-
-  const es = new EventSource('/generate?' + new URLSearchParams({_: Date.now()}));
 
   fetch('/generate', {
     method: 'POST',
@@ -548,25 +556,35 @@ function generate() {
         buf = lines.pop();
         lines.forEach(line => {
           if(line.startsWith('data: ')) {
-            const msg = JSON.parse(line.slice(6));
-            handleMsg(msg);
+            try {
+              const msg = JSON.parse(line.slice(6));
+              handleMsg(msg);
+            } catch(e) { console.error('Parse error', e); }
           }
         });
         read();
       });
     }
     read();
+  }).catch(err => {
+    status.className = 'status-bar';
+    status.textContent = 'Network error: ' + err.message;
+    document.getElementById('genBtn').disabled = false;
   });
 
   function handleMsg(msg) {
     if(msg.type === 'progress') {
-      setStep(msg.step, 'active');
+      setStep(msg.step);
       status.textContent = msg.msg;
     } else if(msg.type === 'done') {
       allDone();
       status.className = 'status-bar done';
       status.textContent = 'Done. Blog generated + SEO validated.';
       currentData = msg.data;
+      currentPlatform = 'Master';
+      // Reset platform button highlights
+      document.querySelectorAll('.platform-tabs .toolbar-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('btnMaster').classList.add('active');
       renderOutput(msg.data);
       document.getElementById('genBtn').disabled = false;
     } else if(msg.type === 'error') {
@@ -589,7 +607,6 @@ function renderSEO(seo) {
   const ring = document.getElementById('scoreRing');
   ring.textContent = score;
   ring.className = 'ring ' + (score >= 70 ? 'good' : score >= 45 ? 'ok' : 'bad');
-
   document.getElementById('scoreLabel').textContent = score >= 70 ? 'Strong' : score >= 45 ? 'Needs work' : 'Weak';
   document.getElementById('scoreSubtxt').textContent = seo.word_count + ' words · ' + seo.keyword_density + '% density';
 
@@ -601,7 +618,6 @@ function renderSEO(seo) {
     ['Lists', seo.has_list ? 'Yes':'No', seo.has_list ? 'good':'ok'],
     ['Snippet ready', seo.snippet_ready ? 'Yes':'No', seo.snippet_ready ? 'good':'ok'],
   ];
-
   document.getElementById('metricsBox').innerHTML = metrics.map(([l,v,c]) =>
     `<div class="metric-row"><span class="metric-label">${l}</span><span class="metric-val ${c}">${v}</span></div>`
   ).join('');
@@ -618,7 +634,6 @@ function renderAnalysis(analysis) {
       </div>`;
     }
   });
-
   const cluster = analysis['CLUSTER_KEYWORDS'] || '';
   if(cluster) {
     html += `<div class="analysis-item">
@@ -630,32 +645,48 @@ function renderAnalysis(analysis) {
 }
 
 function renderBlog(data) {
-  switchTab(currentTab, data);
-}
-
-function switchTab(tab, data) {
-  currentTab = tab;
-  const d = data || currentData;
-  if(!d) return;
-  ['tabPreview','tabOutline','tabHtml'].forEach(id => document.getElementById(id).classList.remove('active'));
-  document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
-
+  if(!data) return;
   const bc = document.getElementById('blogContent');
-  if(tab === 'preview') {
+  const content = getActiveContent();
+
+  ['tabPreview','tabOutline','tabHtml'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.classList.remove('active');
+  });
+  const activeTabEl = document.getElementById('tab' + currentTab.charAt(0).toUpperCase() + currentTab.slice(1));
+  if(activeTabEl) activeTabEl.classList.add('active');
+
+  if(currentTab === 'preview') {
     bc.className = 'blog-content';
-    bc.innerHTML = d.blog_html;
-  } else if(tab === 'outline') {
+    bc.innerHTML = content;
+  } else if(currentTab === 'outline') {
     bc.className = 'blog-content';
-    bc.innerHTML = `<div class="outline-panel">${d.outline}</div>`;
+    bc.innerHTML = `<div class="outline-panel">${data.outline}</div>`;
   } else {
     bc.className = 'blog-content raw';
-    bc.textContent = d.blog_html;
+    bc.textContent = content;
   }
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  renderBlog(currentData);
+}
+
+function switchPlatform(platform) {
+  currentPlatform = platform;
+  const buttons = document.querySelectorAll('.platform-tabs .toolbar-btn');
+  buttons.forEach(btn => btn.classList.remove('active'));
+  const platformLabel = platform === 'Master' ? 'SEO Master' : platform;
+  buttons.forEach(btn => {
+    if(btn.innerText.trim() === platformLabel) btn.classList.add('active');
+  });
+  renderBlog(currentData);
 }
 
 function copyBlog() {
   if(!currentData) return;
-  navigator.clipboard.writeText(currentData.blog_html);
+  navigator.clipboard.writeText(getActiveContent());
   const n = document.getElementById('copyNotice');
   n.classList.add('show');
   setTimeout(() => n.classList.remove('show'), 2000);
@@ -664,44 +695,13 @@ function copyBlog() {
 function downloadBlog() {
   if(!currentData) return;
   const kw = currentData.keyword.replace(/\s+/g,'-').toLowerCase();
-  const blob = new Blob([currentData.blog_html], {type:'text/html'});
+  const suffix = currentPlatform === 'Master' ? '' : '-' + currentPlatform.toLowerCase().replace(/\./g,'');
+  const blob = new Blob([getActiveContent()], {type:'text/html'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `blog-${kw}.html`;
+  a.download = `blog-${kw}${suffix}.html`;
   a.click();
 }
-
-function switchPlatform(platform) {
-  currentPlatform = platform;
-  
-  // Update button UI
-  const buttons = document.querySelectorAll('.platform-tabs .toolbar-btn');
-  buttons.forEach(btn => {
-    btn.classList.toggle('active', btn.innerText.includes(platform));
-  });
-
-  renderBlog(currentData);
-}
-
-// Update your existing switchTab or renderBlog to account for the platform
-function renderBlog(data) {
-  if (!data) return;
-  const bc = document.getElementById('blogContent');
-  
-  // Determine source content
-  let content = (currentPlatform === 'Master') 
-    ? data.blog_html 
-    : data.platform_variants[currentPlatform];
-
-  if (currentTab === 'preview') {
-    bc.className = 'blog-content';
-    bc.innerHTML = content;
-  } else {
-    bc.className = 'blog-content raw';
-    bc.textContent = content;
-  }
-}
-
 </script>
 </body>
 </html>
