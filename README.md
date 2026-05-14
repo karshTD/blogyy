@@ -1,4 +1,4 @@
-# Blogy Engine — AI Blog Generator
+# Blogyy Engine — AI Blog Generator
 
 5-step AI-powered blog pipeline using Groq + LLaMA 3 70B.
 
